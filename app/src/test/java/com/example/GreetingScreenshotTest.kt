@@ -12,10 +12,11 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(qualifiers = RobolectricDeviceQualifiers.Pixel8, sdk = [36])
+@Config(qualifiers = RobolectricDeviceQualifiers.Pixel8, sdk = [34])
 class GreetingScreenshotTest {
 
   @get:Rule val composeTestRule = createComposeRule()
@@ -28,7 +29,9 @@ class GreetingScreenshotTest {
       }
     }
 
-    composeTestRule.onRoot().captureRoboImage(filePath = "src/test/screenshots/greeting.png")
+    val screenshotFile = File("src/test/screenshots/greeting.png")
+    screenshotFile.parentFile?.mkdirs()
+    composeTestRule.onRoot().captureRoboImage(filePath = screenshotFile.path)
   }
 }
 
