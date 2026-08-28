@@ -1,21 +1,21 @@
-# Gamak AI (गमक) — Context-Aware Multilingual Voice Assistant for Android
+# Gamak AI (गमक) — Production-Grade Multilingual Voice & AI Assistant for Android
 
-**Gamak AI** is a production-grade, privacy-conscious voice and text assistant for Android designed for seamless multilingual communication across **Hindi (हिंदी), Nepali (नेपाली), Hinglish, and English**.
+**Gamak AI** is a privacy-conscious, multilingual AI and device automation assistant for Android designed for seamless communication across **Hindi (हिंदी), Nepali (नेपाली), Hinglish, and English**.
 
-Built with Jetpack Compose, Material 3, Kotlin Coroutines/Flow, Room Database, and an intelligent hybrid NLU pipeline combining low-latency on-device intent parsing with Google Gemini LLM reasoning.
+Built with modern **Jetpack Compose**, **Material 3**, **Kotlin Coroutines/Flow**, **Room Database**, and a **hybrid NLU pipeline** combining zero-latency on-device intent parsing with cloud **Google Gemini AI** reasoning.
 
 ---
 
-## 🌟 Key Capabilities
+## 🌟 Key Capabilities & Features
 
 ### 1. Hybrid Multilingual NLU & AI Engine
-- **On-Device Local NLU (`LocalNluEngine`)**: Instant, zero-latency parsing for common device actions, app navigation, system controls, alarms, calls, and WhatsApp messages in Hindi, Nepali, Hinglish, and English without requiring internet connectivity.
-- **Cloud Gemini Reasoning (`GeminiClient`)**: Deep contextual understanding, question answering, multi-step intent breakdown, and rich conversational interactions powered by Google Gemini via server-side/client-side integrations.
-- **Contextual Memory & Pronoun Resolution**: Remembers recent conversation entities (contacts, apps, time, locations) allowing natural follow-ups like *"उसे call करो"* or *"वो app खोलो"*.
-- **Multi-Step Execution Pipeline**: Chains sequential commands with conjunctions (e.g., *"सुबह 7 बजे का अलार्म लगाओ और फिर YouTube खोलो"*).
+- **On-Device Local NLU (`LocalNluEngine`)**: Instant, zero-latency parsing for common device actions, app navigation, system controls, alarms, timers, calls, and WhatsApp messages in Hindi, Nepali, Hinglish, and English without requiring internet connectivity.
+- **Cloud Gemini Reasoning (`GeminiAiClient`)**: Deep contextual understanding, question answering, multi-step intent decomposition, and rich conversational intelligence powered by Google Gemini.
+- **Conversational Context & Pronoun Resolution (`ConversationContext`)**: Remembers recently mentioned contacts, apps, times, and locations across multi-turn interactions (e.g., *"उसे call करो"* or *"वो app खोलो"*).
+- **Multi-Step Execution Pipeline**: Chains sequential commands seamlessly (e.g., *"सुबह 7 बजे का अलार्म लगाओ और फिर YouTube खोलो"*).
 
-### 2. Deep Device & System Tool Integrations
-- **Communications**: Intelligent contact lookup with fuzzy matching, contact disambiguation, direct dialer intents, SMS drafts, and direct WhatsApp messaging flows.
+### 2. Device & System Automation Tools
+- **Communications**: Intelligent contact lookup with fuzzy matching, contact disambiguation, direct dialer intents, SMS drafts, and WhatsApp messaging flows.
 - **App Management**: Dynamic package launcher resolving local aliases (YouTube, Spotify, Camera, Gallery, Settings, Maps, DeskClock, etc.).
 - **Productivity & Time**: Alarm scheduling, count-down timers with system clock integration, and local notification reminders with broadcast receivers (`ReminderBroadcastReceiver`).
 - **Media & Entertainment**: Direct search and playback launches on YouTube and audio streaming apps.
@@ -23,57 +23,17 @@ Built with Jetpack Compose, Material 3, Kotlin Coroutines/Flow, Room Database, a
 
 ### 3. Voice & Audio Architecture
 - **Speech-to-Text (STT)**: Android platform SpeechRecognizer with real-time waveform level monitoring and language tagging.
-- **Text-to-Speech (TTS)**: Dynamic pitch, speed adjustment, and locale selection with automatic Hindi/Nepali/English voice fallback.
+- **Text-to-Speech (TTS)**: Dynamic pitch, speed adjustment, and locale selection with automatic Hindi/Nepali/English voice fallback and tap-to-interrupt capability.
 - **Wake-Word System (`WakeWordService`)**: Foreground service featuring microphone lifecycle coordination, audio focus management, and acoustic energy / syllable-cadence detection.
 
 ### 4. Personas, Theming & Memory Persistence
-- **Personas**: Switch seamlessly between *Gamak (Default)*, *Chhavi (Helpful Guide)*, *Aarav (Tech Companion)*, or a custom assistant name.
-- **Local Persistence (`GamakDatabase`)**: Encrypted on-device Room SQLite database storing conversational memories and key-value preferences.
-- **Material 3 Design**: Expressive animations, pulsating voice orb, dynamic themes (Light/Dark), and adaptive edge-to-edge layout.
+- **Personas**: Switch seamlessly between *Gamak (Default)*, *Maya (Helpful Guide)*, *Sathi (Friendly Companion)*, *Mitra (Assistant)*, or configure a *Custom Assistant Name*.
+- **Local Persistence (`GamakDatabase`)**: On-device Room SQLite database storing conversational memories and key-value preferences with complete user opt-in and memory wipe controls.
+- **Material 3 Design**: Expressive animations, pulsating AI orb, dynamic themes (Light/Dark/System), and adaptive edge-to-edge layout.
 
 ---
 
-## 🏗️ Architecture & Project Structure
-
-The project strictly follows MVVM (Model-View-ViewModel) and Clean Architecture principles:
-
-```
-com.example/
-├── GamakApplication.kt        # Application lifecycle & Room DB initialization
-├── MainActivity.kt            # Edge-to-edge Compose host & Permissions orchestrator
-├── ai/                        # AI & NLU Engine
-│   ├── GeminiClient.kt        # Gemini Generative AI client
-│   └── LocalNluEngine.kt      # Multilingual zero-latency regex & semantic parser
-├── data/                      # Data layer & Assistant engine
-│   └── AssistantEngine.kt     # Central coordinator for Speech, NLU, Memory & TTS
-├── memory/                    # Room Database persistence
-│   ├── MemoryDao.kt           # Memory data access object
-│   ├── MemoryEntity.kt        # SQLite entity for user preferences & facts
-│   └── GamakDatabase.kt       # Room database definition
-├── model/                     # Core domain models
-│   ├── ActionModels.kt        # ActionRequest, ActionResult, AiPlanResult
-│   ├── AssistantPersona.kt    # Persona presets and tone definitions
-│   ├── AssistantState.kt      # State machine (IDLE, LISTENING, THINKING, SPEAKING)
-│   ├── ConversationContext.kt # Entity tracking & pronoun resolution
-│   └── UserSettings.kt        # User configuration state
-├── navigation/                # Compose navigation graphs & routes
-├── planner/                   # Tool dispatching & Execution
-│   ├── ActionExecutor.kt      # Android Intent & tool dispatcher with transaction locks
-│   └── Planner.kt             # Multi-step task decomposition
-├── receiver/                  # System broadcast receivers
-│   └── ReminderBroadcastReceiver.kt # Notification reminders
-├── ui/                        # Jetpack Compose Presentation Layer
-│   ├── components/            # VoiceOrb, WaveformVisualizer, QuickActionPills
-│   ├── screens/               # MainAssistantScreen, SettingsScreen, AboutScreen
-│   └── theme/                 # Material 3 Color Schemes, Typography, Shapes
-└── voice/                     # Audio, Speech & Wake-Word services
-    ├── speech/                # SpeechRecognizer & TextToSpeech managers
-    └── wakeword/              # WakeWordService, WakeWordEngine, Acoustic Detector
-```
-
----
-
-## 🔒 Security & Privacy Notice
+## 🔒 Security & Privacy Architecture
 
 ### Client-Side API Keys Warning
 This repository configures the **Secrets Gradle Plugin** to read `GEMINI_API_KEY` from `.env` or the environment during local development.
@@ -146,29 +106,15 @@ Run all local JVM and Robolectric unit tests:
 ```
 
 Verified Test Suites:
-- `NluPlannerTest`: Multilingual parsing, multi-action orchestration, entity extraction, and pronoun resolution.
+- `NluPlannerTest`: Multilingual parsing, multi-action orchestration, entity extraction, pronoun resolution, retry, and confirmation flows.
 - `Phase5WakeWordTest`: Persona configurations, active display names, and wake engine state transitions.
 - `ExampleRobolectricTest`: Activity lifecycle, service binding, and Room database migrations.
 
 ---
 
-## 🚀 Release Signing Configuration
+## 🚀 Release Configuration & Signing
 
-To build a release-ready APK:
-1. Create your release keystore:
-   ```bash
-   keytool -genkey -v -keystore my-upload-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
-   ```
-2. Export your signing environment variables:
-   ```bash
-   export KEYSTORE_PATH="/path/to/my-upload-key.jks"
-   export STORE_PASSWORD="your-keystore-password"
-   export KEY_PASSWORD="your-key-password"
-   ```
-3. Run the release build:
-   ```bash
-   ./gradlew assembleRelease
-   ```
+Refer to [RELEASE_BUILD.md](RELEASE_BUILD.md) for detailed instructions on generating keystores, configuring signing variables, and assembling production Release APKs and AAB bundles.
 
 ---
 

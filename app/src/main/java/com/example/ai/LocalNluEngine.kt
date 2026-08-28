@@ -678,13 +678,17 @@ object LocalNluEngine {
   }
 
   private fun extractCallContact(text: String): String {
+    val clean = text.replace(Regex("""^(?:यार|भाई|daju|दाजु|please|कृपया|zara|ज़रा|arrey|अरे|suno|सुनो|हे)?\s+""", RegexOption.IGNORE_CASE), "")
+      .replace(Regex("""^(?:यार|भाई|daju|दाजु|please|कृपया|zara|ज़रा|arrey|अरे|suno|सुनो|हे)?\s+""", RegexOption.IGNORE_CASE), "")
+      .trim()
+
     val patterns = listOf(
-      Regex("""(?:यार|भाई|daju)?\s*([A-Za-z\u0900-\u097F]+)\s*(?:को|लाई)\s*(?:call|कॉल|फोन|phone|मिला\s+दे|लगाओ)""", RegexOption.IGNORE_CASE),
-      Regex("""([A-Za-z\u0900-\u097F]+)\s*(?:को|लाई)?\s*(?:call|कॉल|फोन|phone)\s*(?:करो|करना|लगाओ|मिलाओ|गर)""", RegexOption.IGNORE_CASE),
+      Regex("""([A-Za-z\u0900-\u097F]+)\s*(?:ko|lai|को|लाई)\s*(?:call|कॉल|फोन|phone|मिला\s+दे|लगाओ|गर|गर्नु)""", RegexOption.IGNORE_CASE),
+      Regex("""([A-Za-z\u0900-\u097F]+)\s*(?:ko|lai|को|लाई)?\s*(?:call|कॉल|फोन|phone)\s*(?:करो|करना|लगाओ|मिलाओ|गर|गर्नु|lagao|karo)""", RegexOption.IGNORE_CASE),
       Regex("""(?:call|dial|फोन गर|कॉल करो|फोन मिला दे|फोन मिलाओ)\s*([A-Za-z\u0900-\u097F]+)""", RegexOption.IGNORE_CASE)
     )
     for (p in patterns) {
-      val m = p.find(text)
+      val m = p.find(clean)
       if (m != null && m.groupValues.size > 1) {
         val name = m.groupValues[1].trim()
         if (!isStopWord(name)) return name

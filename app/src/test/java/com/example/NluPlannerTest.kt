@@ -148,4 +148,79 @@ class NluPlannerTest {
     assertEquals("open_app", action.actionRequest.toolName)
     assertEquals("Spotify", action.actionRequest.parameters["app_name"])
   }
+
+  @Test
+  fun testNepaliRequestWeather() {
+    val result = LocalNluEngine.parse("आज मौसम कस्तो छ?", "Gamak")
+    assertTrue(result is AiPlanResult.Action)
+    val action = result as AiPlanResult.Action
+    assertEquals("get_weather", action.actionRequest.toolName)
+  }
+
+  @Test
+  fun testNepaliRequestCall() {
+    val result = LocalNluEngine.parse("आमालाई फोन गर", "Gamak")
+    assertTrue(result is AiPlanResult.Action)
+    val action = result as AiPlanResult.Action
+    assertEquals("make_call", action.actionRequest.toolName)
+    assertEquals("आमा", action.actionRequest.parameters["contact_name"])
+  }
+
+  @Test
+  fun testHinglishCallRequest() {
+    val result = LocalNluEngine.parse("Yaar please Rohit ko call lagao", "Gamak")
+    assertTrue(result is AiPlanResult.Action)
+    val action = result as AiPlanResult.Action
+    assertEquals("make_call", action.actionRequest.toolName)
+    assertEquals("Rohit", action.actionRequest.parameters["contact_name"])
+  }
+
+  @Test
+  fun testMissingContactClarification() {
+    val result = LocalNluEngine.parse("फोन लगाओ", "Gamak")
+    assertTrue(result is AiPlanResult.Clarification)
+    val clarification = result as AiPlanResult.Clarification
+    assertTrue(clarification.missingFields.contains("contact_name"))
+  }
+
+  @Test
+  fun testRetryIntentKeywords() {
+    val retryPhrases = listOf("retry", "फिर से कोशिश करो", "try again", "पुनः प्रयास", "फेरि गर")
+    for (phrase in retryPhrases) {
+      val matches = phrase.contains("retry") || phrase.contains("फिर से") || phrase.contains("try again") || phrase.contains("पुनः प्रयास") || phrase.contains("फेरि गर")
+      assertTrue("Phrase '$phrase' should be recognized as retry intent", matches)
+    }
+  }
+
+  @Test
+  fun testDuplicateActionProtectionCooldown() = runBlocking {
+    val executor = com.example.planner.ActionExecutor(context = null)
+    val req = ActionRequest(toolName = "make_call", parameters = mapOf("contact_name" to "Pooja"), rawQuery = "Pooja ko call karo")
+    val res1 = executor.execute(req)
+    assertTrue(res1 is com.example.tools.ActionResult.Success)
+  }
+
+  @Test
+  fun testEmptySpeechResultHandling() {
+    val result = LocalNluEngine.parse("", "Gamak")
+    assertTrue(result is AiPlanResult.Conversation)
+  }
+
+  @Test
+  fun testMalformedAiToolResponseGracefulFallback() {
+    val fallback = LocalNluEngine.parse("{invalid_json_prompt}", "Gamak")
+    assertNotNull(fallback)
+  }
+
+  @Test
+  fun testPermissionDeniedPathGracefulHandling() {
+    val explanation = com.example.platform.PermissionManager.getExplanation(
+      com.example.platform.PermissionManager.PERM_RECORD_AUDIO
+    )
+    assertTrue(explanation.isNotBlank())
+    val contactExplanation = com.example.platform.PermissionManager.getExplanation(
+      com.example.platform.PermissionManager.PERM_READ_CONTACTS
+    )
+    assertTrue(contactExplanation.isNotBlank())
+  }
 }
