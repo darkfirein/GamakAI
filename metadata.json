@@ -1,0 +1,6 @@
+{
+  "name": "Gamak AI",
+  "description": "Next-generation AI Assistant with futuristic dynamic AI orb, adaptive UI states, voice micro-interactions, customizable persona names, and modern Material 3 design.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

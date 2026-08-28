@@ -1,0 +1,12 @@
+## Safe local configuration template for Gamak AI
+# Copy this file to local.properties and set your local SDK location if needed by Android Studio.
+# Note: In CI and Google AI Studio environments, ANDROID_SDK_ROOT is set via environment variables.
+
+# sdk.dir=/Users/YOUR_USERNAME/Library/Android/sdk
+# or on Linux:
+# sdk.dir=/home/YOUR_USERNAME/Android/Sdk
+# or on Windows:
+# sdk.dir=C\:\\Users\\YOUR_USERNAME\\AppData\\Local\\Android\\Sdk
+
+# For Gemini API configuration in local development, use .env or the AI Studio Secrets panel:
+# GEMINI_API_KEY=YOUR_GEMINI_API_KEY
