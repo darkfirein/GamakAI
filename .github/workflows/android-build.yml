@@ -1,4 +1,4 @@
-name: Android CI Build & Test
+Name: Android CI Build & Test
 
 on:
   push:
@@ -46,5 +46,5 @@ jobs:
         with:
           name: gamak-ai-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 1
           if-no-files-found: error
-
