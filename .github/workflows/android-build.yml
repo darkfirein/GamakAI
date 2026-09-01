@@ -35,9 +35,15 @@ jobs:
           fi
 
       - name: Run Unit & Robolectric Tests
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
 
       - name: Build Debug APK
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
 
       - name: Upload Debug APK Artifact

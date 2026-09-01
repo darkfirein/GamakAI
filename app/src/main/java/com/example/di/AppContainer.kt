@@ -2,7 +2,9 @@ package com.example.di
 
 import android.content.Context
 import com.example.ai.AiClient
+import com.example.ai.CompositeAiClient
 import com.example.ai.GeminiAiClient
+import com.example.ai.OpenAiClient
 import com.example.data.AssistantEngine
 import com.example.data.SettingsRepository
 import com.example.memory.MemoryRepository
@@ -44,8 +46,20 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
     ToolRegistry()
   }
 
+  val openAiClient: OpenAiClient by lazy {
+    OpenAiClient(toolRegistry = toolRegistry)
+  }
+
+  val geminiAiClient: GeminiAiClient by lazy {
+    GeminiAiClient(toolRegistry = toolRegistry)
+  }
+
   val aiClient: AiClient by lazy {
-    GeminiAiClient(toolRegistry)
+    CompositeAiClient(
+      primaryClient = openAiClient,
+      secondaryClient = geminiAiClient,
+      toolRegistry = toolRegistry
+    )
   }
 
   val actionExecutor: ActionExecutor by lazy {
@@ -55,6 +69,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
   override val planner: Planner by lazy {
     Planner(aiClient, toolRegistry, actionExecutor)
   }
+
 
   override val speechToTextManager: SpeechToTextManager by lazy {
     SpeechToTextManager(context)

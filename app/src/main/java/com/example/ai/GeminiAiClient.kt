@@ -18,7 +18,12 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 class GeminiAiClient(
-  private val toolRegistry: ToolRegistry = ToolRegistry()
+  private val toolRegistry: ToolRegistry = ToolRegistry(),
+  private val apiKeyProvider: () -> String = {
+    System.getenv("GEMINI_API_KEY")?.trim()?.takeIf { it.isNotBlank() && it != "MY_GEMINI_API_KEY" }
+      ?: System.getProperty("GEMINI_API_KEY")?.trim()?.takeIf { it.isNotBlank() && it != "MY_GEMINI_API_KEY" }
+      ?: BuildConfig.GEMINI_API_KEY.trim()
+  }
 ) : AiClient {
 
   private val client: OkHttpClient = OkHttpClient.Builder()
@@ -32,19 +37,25 @@ class GeminiAiClient(
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
   }
 
+  override fun isAvailable(): Boolean {
+    val key = apiKeyProvider()
+    return key.isNotBlank() && key != "MY_GEMINI_API_KEY"
+  }
+
   override suspend fun generatePlan(
     prompt: String,
     conversationHistory: List<ChatMessage>,
     personaName: String,
     memoryContext: List<String>
   ): AiPlanResult = withContext(Dispatchers.IO) {
-    val apiKey = BuildConfig.GEMINI_API_KEY
+    val apiKey = apiKeyProvider()
 
     // If API key is empty or placeholder, gracefully use LocalNluEngine
     if (apiKey.isBlank() || apiKey == "MY_GEMINI_API_KEY") {
       Log.d(TAG, "Using LocalNluEngine (API key not configured or default placeholder)")
       return@withContext LocalNluEngine.parse(prompt, personaName)
     }
+
 
     try {
       val toolsSchema = buildToolsJsonDescription()

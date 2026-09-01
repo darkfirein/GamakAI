@@ -40,6 +40,8 @@ sealed interface AiPlanResult {
 }
 
 interface AiClient {
+  fun isAvailable(): Boolean = true
+
   suspend fun generatePlan(
     prompt: String,
     conversationHistory: List<ChatMessage>,
@@ -47,3 +49,4 @@ interface AiClient {
     memoryContext: List<String> = emptyList()
   ): AiPlanResult
 }
+
