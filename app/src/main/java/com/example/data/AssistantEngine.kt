@@ -144,7 +144,8 @@ class AssistantEngine(
           override fun onError(errorCode: Int, errorMessage: String) {
             wakeWordEngine?.resume()
             Log.w(TAG, "STT Error ($errorCode): $errorMessage")
-            if (errorCode == 7 || errorCode == 6) { // ERROR_NO_MATCH or ERROR_SPEECH_TIMEOUT
+            if (errorCode == 7 || errorCode == 6 || errorCode == 8 || errorCode == 11) {
+              // ERROR_NO_MATCH, ERROR_SPEECH_TIMEOUT, ERROR_RECOGNIZER_BUSY, ERROR_SERVER_DISCONNECTED
               _state.value = AssistantState.IDLE
             } else {
               _state.value = AssistantState.ERROR

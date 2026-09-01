@@ -223,4 +223,64 @@ class NluPlannerTest {
     )
     assertTrue(contactExplanation.isNotBlank())
   }
+
+  @Test
+  fun testConversationalQuestionsDoNotUseGenericReadyToWorkPlaceholder() {
+    val queries = listOf(
+      "नमस्ते! क्या हाल है?",
+      "Who are you?",
+      "तपाईं को हुनुहुन्छ?",
+      "Tell me a joke",
+      "चुटकुला सुनाओ",
+      "what time is it",
+      "समय क्या हुआ है",
+      "5 + 10",
+      "What is artificial intelligence?",
+      "प्रकाश संश्लेषण के हो?"
+    )
+
+    for (query in queries) {
+      val result = LocalNluEngine.parse(query, "Gamak")
+      assertTrue("Query '$query' should resolve to Conversation", result is AiPlanResult.Conversation)
+      val conv = result as AiPlanResult.Conversation
+      assertTrue("Response should not be empty", conv.responseText.isNotBlank())
+      assertTrue(
+        "Response must never contain the obsolete generic 'काम करने के लिए तैयार है' phrase",
+        !conv.responseText.contains("काम करने के लिए तैयार है")
+      )
+      assertTrue(
+        "Response must never contain 'ready to work on this'",
+        !conv.responseText.contains("ready to work on this", ignoreCase = true)
+      )
+    }
+  }
+
+  @Test
+  fun testDeviceActionVsConversationRoutingIntegrity() {
+    // Real actions should route to Action
+    val callAction = LocalNluEngine.parse("Call Rahul", "Gamak")
+    assertTrue(callAction is AiPlanResult.Action && (callAction as AiPlanResult.Action).actionRequest.toolName == "make_call")
+
+    val alarmAction = LocalNluEngine.parse("सुबह 6 बजे का अलार्म लगाओ", "Gamak")
+    assertTrue(alarmAction is AiPlanResult.Action && (alarmAction as AiPlanResult.Action).actionRequest.toolName == "set_alarm")
+
+    val ytAction = LocalNluEngine.parse("YouTube खोलो", "Gamak")
+    assertTrue(ytAction is AiPlanResult.Action && (ytAction as AiPlanResult.Action).actionRequest.toolName == "open_youtube")
+
+    val weatherAction = LocalNluEngine.parse("What is the weather today?", "Gamak")
+    assertTrue(weatherAction is AiPlanResult.Action && (weatherAction as AiPlanResult.Action).actionRequest.toolName == "get_weather")
+
+    val mapsAction = LocalNluEngine.parse("घर जाने का रास्ता दिखाओ", "Gamak")
+    assertTrue(mapsAction is AiPlanResult.Action && (mapsAction as AiPlanResult.Action).actionRequest.toolName == "navigate_maps")
+
+    // Pure conversational chit-chat & questions must route to Conversation
+    val greeting = LocalNluEngine.parse("Hello Gamak", "Gamak")
+    assertTrue(greeting is AiPlanResult.Conversation)
+
+    val howAreYou = LocalNluEngine.parse("How are you doing today?", "Gamak")
+    assertTrue(howAreYou is AiPlanResult.Conversation)
+
+    val mathQuestion = LocalNluEngine.parse("25 * 4", "Gamak")
+    assertTrue(mathQuestion is AiPlanResult.Conversation && (mathQuestion as AiPlanResult.Conversation).responseText.contains("100"))
+  }
 }

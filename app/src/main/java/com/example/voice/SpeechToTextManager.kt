@@ -40,9 +40,7 @@ class SpeechToTextManager(private val context: Context) {
     preferredLanguage: String = "hi-IN",
     callback: SpeechRecognitionCallback
   ) = withContext(Dispatchers.Main) {
-    if (isCurrentlyListening) {
-      stopListening()
-    }
+    cleanup()
 
     if (!SpeechRecognizer.isRecognitionAvailable(context)) {
       callback.onError(SpeechRecognizer.ERROR_CLIENT, "Speech recognition is not available on this device.")
@@ -50,54 +48,55 @@ class SpeechToTextManager(private val context: Context) {
     }
 
     try {
-      speechRecognizer?.destroy()
-      speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
-        setRecognitionListener(object : RecognitionListener {
-          override fun onReadyForSpeech(params: Bundle?) {
-            isCurrentlyListening = true
-            callback.onReady()
+      val recognizer = SpeechRecognizer.createSpeechRecognizer(context)
+      speechRecognizer = recognizer
+      recognizer.setRecognitionListener(object : RecognitionListener {
+        override fun onReadyForSpeech(params: Bundle?) {
+          isCurrentlyListening = true
+          callback.onReady()
+        }
+
+        override fun onBeginningOfSpeech() {
+          callback.onBeginningOfSpeech()
+        }
+
+        override fun onRmsChanged(rmsdB: Float) {
+          callback.onRmsChanged(rmsdB)
+        }
+
+        override fun onBufferReceived(buffer: ByteArray?) {}
+
+        override fun onEndOfSpeech() {
+          isCurrentlyListening = false
+          callback.onEndOfSpeech()
+        }
+
+        override fun onError(error: Int) {
+          isCurrentlyListening = false
+          val msg = getErrorMessage(error)
+          Log.w(TAG, "Speech recognition error: $error ($msg)")
+          // Cleanup on error so subsequent requests don't hit busy/server disconnected state
+          cleanup()
+          callback.onError(error, msg)
+        }
+
+        override fun onResults(results: Bundle?) {
+          isCurrentlyListening = false
+          val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+          val text = matches?.firstOrNull() ?: ""
+          callback.onFinalResult(text)
+        }
+
+        override fun onPartialResults(partialResults: Bundle?) {
+          val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+          val text = matches?.firstOrNull() ?: ""
+          if (text.isNotBlank()) {
+            callback.onPartialResult(text)
           }
+        }
 
-          override fun onBeginningOfSpeech() {
-            callback.onBeginningOfSpeech()
-          }
-
-          override fun onRmsChanged(rmsdB: Float) {
-            callback.onRmsChanged(rmsdB)
-          }
-
-          override fun onBufferReceived(buffer: ByteArray?) {}
-
-          override fun onEndOfSpeech() {
-            isCurrentlyListening = false
-            callback.onEndOfSpeech()
-          }
-
-          override fun onError(error: Int) {
-            isCurrentlyListening = false
-            val msg = getErrorMessage(error)
-            Log.w(TAG, "Speech recognition error: $error ($msg)")
-            callback.onError(error, msg)
-          }
-
-          override fun onResults(results: Bundle?) {
-            isCurrentlyListening = false
-            val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-            val text = matches?.firstOrNull() ?: ""
-            callback.onFinalResult(text)
-          }
-
-          override fun onPartialResults(partialResults: Bundle?) {
-            val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-            val text = matches?.firstOrNull() ?: ""
-            if (text.isNotBlank()) {
-              callback.onPartialResult(text)
-            }
-          }
-
-          override fun onEvent(eventType: Int, params: Bundle?) {}
-        })
-      }
+        override fun onEvent(eventType: Int, params: Bundle?) {}
+      })
 
       val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
         putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -110,11 +109,24 @@ class SpeechToTextManager(private val context: Context) {
         putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
       }
 
-      speechRecognizer?.startListening(intent)
+      recognizer.startListening(intent)
     } catch (e: Exception) {
       Log.e(TAG, "Failed to start speech recognition", e)
-      isCurrentlyListening = false
+      cleanup()
       callback.onError(SpeechRecognizer.ERROR_CLIENT, e.localizedMessage ?: "Unknown speech error")
+    }
+  }
+
+  private fun cleanup() {
+    try {
+      isCurrentlyListening = false
+      speechRecognizer?.apply {
+        cancel()
+        destroy()
+      }
+      speechRecognizer = null
+    } catch (e: Exception) {
+      Log.w(TAG, "Error cleaning up SpeechRecognizer", e)
     }
   }
 
@@ -130,22 +142,11 @@ class SpeechToTextManager(private val context: Context) {
   }
 
   fun cancel() {
-    try {
-      isCurrentlyListening = false
-      speechRecognizer?.cancel()
-    } catch (e: Exception) {
-      Log.w(TAG, "Error cancelling SpeechRecognizer", e)
-    }
+    cleanup()
   }
 
   fun destroy() {
-    try {
-      isCurrentlyListening = false
-      speechRecognizer?.destroy()
-      speechRecognizer = null
-    } catch (e: Exception) {
-      Log.w(TAG, "Error destroying SpeechRecognizer", e)
-    }
+    cleanup()
   }
 
   private fun getErrorMessage(errorCode: Int): String {
@@ -156,9 +157,14 @@ class SpeechToTextManager(private val context: Context) {
       SpeechRecognizer.ERROR_NETWORK -> "Network connection error"
       SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout"
       SpeechRecognizer.ERROR_NO_MATCH -> "No speech recognized"
-      SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognition service busy"
+      SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognition service busy. Resetting..."
       SpeechRecognizer.ERROR_SERVER -> "Recognition server error"
       SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech input detected"
+      11 -> "Recognition server disconnected. Resetting..." // ERROR_SERVER_DISCONNECTED on Android 12+
+      10 -> "Too many recognition requests"
+      12 -> "Language not supported"
+      13 -> "Language unavailable"
+      14 -> "Cannot check language support"
       else -> "Speech recognition error ($errorCode)"
     }
   }

@@ -485,24 +485,125 @@ object LocalNluEngine {
       )
     }
 
-    // 18. Conversational Greetings & General Dialogue
-    val greetings = listOf("नमस्ते", "hello", "hi", "namaste", "hey", "hola", "नमस्कार", "pranam")
+    // 18. Conversational Dialogue & Fallback Responses
+    val isNepali = containsAny(lower, "छ", "हुनुहुन्छ", "गर्नु", "गरिदेऊ", "आमा", "दाजु", "कस्तो", "सन्चै", "बज्यो", "हुन्न", "पर्दैन", "भनेर", "दिनु")
+    val isEnglish = clean.matches(Regex("""^[a-zA-Z0-9\s?,.!'":;@#$%^&*()_\-+=/]+$""")) && !containsAny(lower, "bhai", "yaar", "karo", "khol", "kholo", "lagao", "batao", "de", "do", "hai", "kaise", "kya")
+
+    // Greetings
+    val greetings = listOf("नमस्ते", "hello", "hi", "namaste", "hey", "hola", "नमस्कार", "pranam", "प्रणाम")
     if (greetings.any { lower.startsWith(it) || lower == it }) {
-      return AiPlanResult.Conversation(
-        responseText = "नमस्ते! मैं $personaName हूँ। आपकी क्या मदद कर सकता हूँ?"
-      )
+      val reply = when {
+        isNepali -> "नमस्ते! म $personaName हुँ। म तपाईंलाई के सहयोग गर्न सक्छु?"
+        isEnglish -> "Hello! I'm $personaName. How can I help you today?"
+        else -> "नमस्ते! मैं $personaName हूँ। आपकी क्या मदद कर सकता हूँ?"
+      }
+      return AiPlanResult.Conversation(responseText = reply)
     }
 
-    if (containsAny(lower, "who are you", "तुम कौन हो", "तपाईं को हुनुहुन्छ", "about yourself", "identity", "के हो")) {
-      return AiPlanResult.Conversation(
-        responseText = "मैं $personaName हूँ, Gamak AI का व्यक्तिगत बुद्धिमत्ता सहायक। मैं हिंदी, नेपाली, हिंग्लिश और अंग्रेजी में आदेश समझ कर आपके डिवाइस पर कार्य निष्पादित करता हूँ।"
-      )
+    // Well-being & Casual Small Talk
+    if (containsAny(lower, "how are you", "kya haal hai", "kasto chha", "sanchai chhau", "क्या हाल है", "कस्तो छ", "हालचाल", "सब ठीक", "thik chha", "kya chal raha hai")) {
+      val reply = when {
+        isNepali -> "म एकदम सन्चै छु! भन्नुहोस्, आज म तपाईंलाई के सहयोग गर्न सक्छु?"
+        isEnglish -> "I'm doing great, thank you! How can I assist you today?"
+        else -> "मैं बिल्कुल ठीक हूँ! आप बताइए, आज मैं आपकी क्या मदद करूँ?"
+      }
+      return AiPlanResult.Conversation(responseText = reply)
     }
 
-    // Default conversational reply
-    return AiPlanResult.Conversation(
-      responseText = "मैंने समझा: \"$clean\"। $personaName इस पर काम करने के लिए तैयार है।"
-    )
+    // Identity & Capabilities
+    if (containsAny(lower, "who are you", "तुम कौन हो", "तपाईं को हुनुहुन्छ", "about yourself", "identity", "what is gamak", "what can you do", "क्या कर सकते हो", "तिमी के गर्न सक्छौ", "help", "मदद", "features", "सुविधा")) {
+      val reply = when {
+        isNepali -> "म $personaName हुँ, Gamak AI को बुद्धिमत्ता सहायक। म नेपाली, हिन्दी, हिंग्लिश र अंग्रेजीमा आदेश बुझेर तपाईंको फोनमा कल, म्यासेज, अलार्म, युट्युब, मौसम र एपहरू चलाउन सक्छु।"
+        isEnglish -> "I am $personaName, your intelligent voice assistant in Gamak AI. I can make calls, send SMS/WhatsApp, set alarms & timers, navigate, check weather, open apps, and answer your questions."
+        else -> "मैं $personaName हूँ, Gamak AI का व्यक्तिगत बुद्धिमत्ता सहायक। मैं हिंदी, नेपाली, हिंग्लिश और अंग्रेजी में आदेश समझ कर आपके डिवाइस पर कॉल, मैसेज, अलार्म, टाइमर, रिमाइंडर, यूट्यूब, मैप्स और ऐप्स खोलने जैसे कार्य करता हूँ।"
+      }
+      return AiPlanResult.Conversation(responseText = reply)
+    }
+
+    // Current Time / Date
+    if (containsAny(lower, "what time is it", "time kya hua", "समय क्या हुआ", "कति बज्यो", "time batao", "current time", "kitne baje")) {
+      val timeFormat = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault()).format(java.util.Date())
+      val reply = when {
+        isNepali -> "अहिलेको समय $timeFormat हो।"
+        isEnglish -> "The current time is $timeFormat."
+        else -> "अभी का समय $timeFormat है।"
+      }
+      return AiPlanResult.Conversation(responseText = reply)
+    }
+    if (containsAny(lower, "date", "तारीख", "मिति", "aaj konsa din", "what day is today", "what is today's date")) {
+      val dateFormat = java.text.SimpleDateFormat("EEEE, d MMMM yyyy", java.util.Locale.getDefault()).format(java.util.Date())
+      val reply = when {
+        isNepali -> "आजको मिति $dateFormat हो।"
+        isEnglish -> "Today is $dateFormat."
+        else -> "आज $dateFormat है।"
+      }
+      return AiPlanResult.Conversation(responseText = reply)
+    }
+
+    // Gratitude & Compliments
+    if (containsAny(lower, "thank you", "thanks", "धन्यवाद", "shukriya", "dhanyabad", "शुक्रिया", "great job", "शाबाश", "बढ़िया", "ramro", "very good", "nice")) {
+      val reply = when {
+        isNepali -> "धेरै धेरै धन्यवाद! केही थप सहयोग चाहिएमा कृपया भन्नुहोस्।"
+        isEnglish -> "You're very welcome! Let me know if you need anything else."
+        else -> "आपका बहुत-बहुत धन्यवाद! अगर आपको कुछ और सहायता चाहिए तो अवश्य बताएं।"
+      }
+      return AiPlanResult.Conversation(responseText = reply)
+    }
+
+    // Jokes & Humor
+    if (containsAny(lower, "joke", "चुटकुला", "chutkula", "hasau", "रमाइलो", "मज़ाक", "हँसाओ")) {
+      val reply = when {
+        isNepali -> "शिक्षक: 'तिमी किन ढिलो आयौ?' विद्यार्थी: 'बाटोको बोर्डले भन्यो - अगाडि विद्यालय छ, बिस्तारै जानुहोस्!'"
+        isEnglish -> "Why did the computer show up at work late? It had a hard drive!"
+        else -> "शिक्षक ने पूछा: 'अगर तुम्हारे पास 4 समोसे हैं और 2 खा लिए, तो क्या बचेगा?' छात्र: 'सर, सिर्फ चटनी और पछतावा!'"
+      }
+      return AiPlanResult.Conversation(responseText = reply)
+    }
+
+    // Basic Math Calculation Evaluation
+    val mathMatch = Regex("""(?:calculate|what is|कितना होता है|कति हुन्छ)?\s*(\d+(?:\.\d+)?)\s*([\+\-\*\/]|plus|minus|into|times|divided by|गुना|भागा|जोड़)\s*(\d+(?:\.\d+)?)""", RegexOption.IGNORE_CASE).find(clean)
+    if (mathMatch != null) {
+      val num1 = mathMatch.groupValues[1].toDoubleOrNull()
+      val op = mathMatch.groupValues[2].lowercase()
+      val num2 = mathMatch.groupValues[3].toDoubleOrNull()
+      if (num1 != null && num2 != null) {
+        val calc = when {
+          op == "+" || op == "plus" || op == "जोड़" -> num1 + num2
+          op == "-" || op == "minus" -> num1 - num2
+          op == "*" || op == "into" || op == "times" || op == "गुना" -> num1 * num2
+          op == "/" || op == "divided by" || op == "भागा" -> if (num2 != 0.0) num1 / num2 else null
+          else -> null
+        }
+        if (calc != null) {
+          val formatted = if (calc % 1.0 == 0.0) calc.toLong().toString() else "%.2f".format(calc)
+          val reply = when {
+            isNepali -> "उत्तर $formatted हुन्छ।"
+            isEnglish -> "The result is $formatted."
+            else -> "उत्तर $formatted है।"
+          }
+          return AiPlanResult.Conversation(responseText = reply)
+        }
+      }
+    }
+
+    // General Questions / Informational queries fallback
+    if (containsAny(lower, "what is", "why", "who is", "how", "क्या है", "किसे कहते", "किन", "कसरी", "कहाँ", "कसको", "बताओ", "explain", "meaning", "define")) {
+      val reply = when {
+        isNepali -> "विस्तृत ज्ञान र खोजका लागि इन्टरनेट वा Gemini AI सेवा आवश्यक पर्दछ। तर म तपाईंको फोनमा कल गर्न, म्यासेज पठाउन, अलार्म लगाउन, मौसम हेर्न वा एपहरू खोल्न सक्छु।"
+        isEnglish -> "For in-depth online answers, an active connection with Gemini AI is recommended. Meanwhile, I can help you make calls, send messages, set alarms, navigate, or launch apps on your device."
+        else -> "विस्तृत जानकारी और ऑनलाइन उत्तरों के लिए Gemini AI सेवा का उपयोग किया जा सकता है। इस बीच, मैं आपके डिवाइस पर कॉल, मैसेज, अलार्म, टाइमर, मौसम या ऐप्स खोलने में पूरी मदद कर सकता हूँ।"
+      }
+      return AiPlanResult.Conversation(responseText = reply)
+    }
+
+    // Default natural conversational fallback (Never generic "ready to work" placeholder)
+    val defaultReply = when {
+      isNepali -> "म तपाईंको कुरा सुन्दै छु। तपाईं मलाई कल, म्यासेज, अलार्म, मौसम वा एपहरू खोल्ने निर्देशन दिन सक्नुहुन्छ।"
+      isEnglish -> "I'm listening. You can ask me questions or ask me to make calls, send messages, set alarms, check the weather, or open apps."
+      else -> "मैं आपकी बात सुन रहा हूँ। आप मुझसे कॉल करने, मैसेज भेजने, अलार्म/टाइमर लगाने, मौसम जानने या ऐप्स खोलने के निर्देश दे सकते हैं।"
+    }
+
+    return AiPlanResult.Conversation(responseText = defaultReply)
   }
 
   fun resolveClarificationFollowUp(
