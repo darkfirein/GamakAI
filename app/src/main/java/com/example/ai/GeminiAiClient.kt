@@ -34,11 +34,15 @@ class GeminiAiClient(
   companion object {
     private const val TAG = "GeminiAiClient"
     private const val MODEL_ENDPOINT =
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
   }
 
   override fun isAvailable(): Boolean {
-    val key = apiKeyProvider()
+    val key = try {
+      apiKeyProvider().trim()
+    } catch (_: Exception) {
+      ""
+    }
     return key.isNotBlank() && key != "MY_GEMINI_API_KEY"
   }
 
@@ -196,7 +200,7 @@ class GeminiAiClient(
     }
   }
 
-  private fun parseGeminiResponse(
+  fun parseGeminiResponse(
     responseBody: String,
     rawPrompt: String,
     personaName: String
