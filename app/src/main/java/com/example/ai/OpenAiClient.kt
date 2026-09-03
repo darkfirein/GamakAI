@@ -49,7 +49,11 @@ class OpenAiClient(
   private val recentRequests = ConcurrentHashMap<String, Pair<Long, AiPlanResult>>()
 
   override fun isAvailable(): Boolean {
-    val key = apiKeyProvider().trim()
+    val key = try {
+      apiKeyProvider().trim()
+    } catch (_: Exception) {
+      ""
+    }
     return key.isNotBlank() && key != "MY_OPENAI_API_KEY"
   }
 
