@@ -25,14 +25,14 @@ import java.util.concurrent.TimeUnit
 class OpenAiClient(
   private val toolRegistry: ToolRegistry = ToolRegistry(),
   private val apiKeyProvider: () -> String = {
-    System.getenv("OPENAI_API_KEY")?.trim()?.takeIf { it.isNotBlank() && it != "MY_OPENAI_API_KEY" }
-      ?: System.getProperty("OPENAI_API_KEY")?.trim()?.takeIf { it.isNotBlank() && it != "MY_OPENAI_API_KEY" }
-      ?: BuildConfig.OPENAI_API_KEY.trim()
+    sanitizeApiKey(System.getenv("OPENAI_API_KEY"))
+      .ifBlank { sanitizeApiKey(System.getProperty("OPENAI_API_KEY")) }
+      .ifBlank { sanitizeApiKey(BuildConfig.OPENAI_API_KEY) }
   },
   private val client: OkHttpClient = OkHttpClient.Builder()
-    .connectTimeout(10, TimeUnit.SECONDS)
-    .readTimeout(15, TimeUnit.SECONDS)
-    .writeTimeout(10, TimeUnit.SECONDS)
+    .connectTimeout(12, TimeUnit.SECONDS)
+    .readTimeout(20, TimeUnit.SECONDS)
+    .writeTimeout(12, TimeUnit.SECONDS)
     .build(),
   private val model: String = "gpt-4o-mini",
   private val baseUrl: String = "https://api.openai.com/v1"
@@ -43,14 +43,23 @@ class OpenAiClient(
     private const val MAX_RETRIES = 1
     private const val RETRY_DELAY_MS = 500L
     private const val DEBOUNCE_WINDOW_MS = 1200L
+
+    fun sanitizeApiKey(rawKey: String?): String {
+      if (rawKey.isNullOrBlank()) return ""
+      val trimmed = rawKey.trim()
+        .removeSurrounding("\"")
+        .removeSurrounding("'")
+        .trim()
+      return if (trimmed == "MY_OPENAI_API_KEY" || trimmed == "MY_GEMINI_API_KEY") "" else trimmed
+    }
   }
 
   // Deduplication cache: Key = clean prompt, Value = (Timestamp, Result)
   private val recentRequests = ConcurrentHashMap<String, Pair<Long, AiPlanResult>>()
 
   override fun isAvailable(): Boolean {
-    val key = apiKeyProvider().trim()
-    return key.isNotBlank() && key != "MY_OPENAI_API_KEY"
+    val key = sanitizeApiKey(apiKeyProvider())
+    return key.isNotBlank()
   }
 
   override suspend fun generatePlan(
@@ -61,8 +70,8 @@ class OpenAiClient(
   ): AiPlanResult = withContext(Dispatchers.IO) {
     currentCoroutineContext().ensureActive()
 
-    val apiKey = apiKeyProvider().trim()
-    if (apiKey.isBlank() || apiKey == "MY_OPENAI_API_KEY") {
+    val apiKey = sanitizeApiKey(apiKeyProvider())
+    if (apiKey.isBlank()) {
       Log.d(TAG, "OpenAI API key is not configured or is placeholder.")
       return@withContext AiPlanResult.Error("OpenAI API key not configured")
     }
@@ -78,6 +87,8 @@ class OpenAiClient(
       }
     }
 
+    Log.d(TAG, "OpenAI request started (prompt length=${cleanPrompt.length}, model=$model)")
+
     val systemPrompt = buildSystemPrompt(personaName, memoryContext)
     val requestJson = buildRequestBody(systemPrompt, cleanPrompt, conversationHistory)
 
@@ -89,12 +100,15 @@ class OpenAiClient(
       try {
         val result = executeChatCompletion(apiKey, requestJson, cleanPrompt, personaName)
         if (result !is AiPlanResult.Error) {
+          Log.d(TAG, "OpenAI response parsed successfully: type=${result.javaClass.simpleName}")
           recentRequests[cleanPrompt] = Pair(now, result)
           return@withContext result
         }
 
-        // If it's a non-retryable error (e.g. 401 unauthorized), return immediately
-        if (result.message.contains("401") || result.message.contains("invalid_api_key")) {
+        // Non-retryable client errors (400, 401, 403, 429)
+        if (result.message.contains("401") || result.message.contains("403") ||
+          result.message.contains("400") || result.message.contains("429")) {
+          Log.w(TAG, "Non-retryable OpenAI error encountered: ${result.message}")
           return@withContext result
         }
 
@@ -112,6 +126,7 @@ class OpenAiClient(
     }
 
     val errorMsg = lastException?.localizedMessage ?: "Unknown OpenAI network error"
+    Log.w(TAG, "OpenAI request failed after retries: $errorMsg")
     AiPlanResult.Error("OpenAI request failed after $MAX_RETRIES retries: $errorMsg")
   }
 
@@ -257,12 +272,29 @@ class OpenAiClient(
       .build()
 
     val response = client.newCall(request).execute()
+    val responseCode = response.code
     val responseBody = response.body?.string()
 
+    Log.d(TAG, "OpenAI HTTP status: $responseCode")
+
     if (!response.isSuccessful || responseBody.isNullOrBlank()) {
-      val code = response.code
-      Log.w(TAG, "OpenAI API returned HTTP $code: $responseBody")
-      return AiPlanResult.Error("OpenAI API error ($code): ${responseBody ?: "Empty response"}")
+      val errorDetail = try {
+        val errObj = JSONObject(responseBody ?: "")
+        errObj.optJSONObject("error")?.optString("message") ?: responseBody
+      } catch (e: Exception) {
+        responseBody
+      }
+
+      val errorMessage = when (responseCode) {
+        401 -> "OpenAI Authentication Failed (HTTP 401): Invalid API Key or Unauthorized. ${errorDetail ?: ""}".trim()
+        403 -> "OpenAI Access Forbidden (HTTP 403): ${errorDetail ?: "Forbidden"}"
+        429 -> "OpenAI Rate Limit / Quota Exceeded (HTTP 429): ${errorDetail ?: "Rate limit reached"}"
+        in 500..599 -> "OpenAI Server Error (HTTP $responseCode): ${errorDetail ?: "Server unavailable"}"
+        else -> "OpenAI HTTP Error $responseCode: ${errorDetail ?: "Request failed"}"
+      }
+
+      Log.w(TAG, "OpenAI request failed ($responseCode): $errorMessage")
+      return AiPlanResult.Error(errorMessage)
     }
 
     return parseOpenAiResponse(responseBody, rawPrompt, personaName)
@@ -278,7 +310,6 @@ class OpenAiClient(
       val choices = root.optJSONArray("choices") ?: return AiPlanResult.Error("Missing choices array in OpenAI response")
       if (choices.length() == 0) return AiPlanResult.Error("Empty choices returned from OpenAI")
 
-
       val firstChoice = choices.getJSONObject(0)
       val messageObj = firstChoice.optJSONObject("message") ?: return AiPlanResult.Error("Missing message in choice")
       val rawContent = messageObj.optString("content", "").trim()
@@ -287,11 +318,7 @@ class OpenAiClient(
         return AiPlanResult.Error("Empty content from OpenAI")
       }
 
-      val cleanJson = rawContent
-        .removePrefix("```json")
-        .removePrefix("```")
-        .removeSuffix("```")
-        .trim()
+      val cleanJson = stripMarkdownCodeFences(rawContent)
 
       val parsed = try {
         JSONObject(cleanJson)
@@ -391,6 +418,17 @@ class OpenAiClient(
       Log.e(TAG, "Error parsing OpenAI response", e)
       AiPlanResult.Error("Failed to parse OpenAI response: ${e.localizedMessage}")
     }
+  }
+
+  private fun stripMarkdownCodeFences(text: String): String {
+    var clean = text.trim()
+    if (clean.startsWith("```")) {
+      clean = clean.substringAfter("\n")
+    }
+    if (clean.endsWith("```")) {
+      clean = clean.substringBeforeLast("```")
+    }
+    return clean.trim()
   }
 
   private fun extractJsonMap(jsonObj: JSONObject?): Map<String, String> {

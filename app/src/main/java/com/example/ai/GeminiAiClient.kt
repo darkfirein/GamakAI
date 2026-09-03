@@ -20,26 +20,35 @@ import java.util.concurrent.TimeUnit
 class GeminiAiClient(
   private val toolRegistry: ToolRegistry = ToolRegistry(),
   private val apiKeyProvider: () -> String = {
-    System.getenv("GEMINI_API_KEY")?.trim()?.takeIf { it.isNotBlank() && it != "MY_GEMINI_API_KEY" }
-      ?: System.getProperty("GEMINI_API_KEY")?.trim()?.takeIf { it.isNotBlank() && it != "MY_GEMINI_API_KEY" }
-      ?: BuildConfig.GEMINI_API_KEY.trim()
+    sanitizeApiKey(System.getenv("GEMINI_API_KEY"))
+      .ifBlank { sanitizeApiKey(System.getProperty("GEMINI_API_KEY")) }
+      .ifBlank { sanitizeApiKey(BuildConfig.GEMINI_API_KEY) }
   }
 ) : AiClient {
 
   private val client: OkHttpClient = OkHttpClient.Builder()
-    .connectTimeout(10, TimeUnit.SECONDS)
-    .readTimeout(15, TimeUnit.SECONDS)
+    .connectTimeout(12, TimeUnit.SECONDS)
+    .readTimeout(20, TimeUnit.SECONDS)
     .build()
 
   companion object {
     private const val TAG = "GeminiAiClient"
     private const val MODEL_ENDPOINT =
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+
+    fun sanitizeApiKey(rawKey: String?): String {
+      if (rawKey.isNullOrBlank()) return ""
+      val trimmed = rawKey.trim()
+        .removeSurrounding("\"")
+        .removeSurrounding("'")
+        .trim()
+      return if (trimmed == "MY_GEMINI_API_KEY" || trimmed == "MY_OPENAI_API_KEY") "" else trimmed
+    }
   }
 
   override fun isAvailable(): Boolean {
-    val key = apiKeyProvider()
-    return key.isNotBlank() && key != "MY_GEMINI_API_KEY"
+    val key = sanitizeApiKey(apiKeyProvider())
+    return key.isNotBlank()
   }
 
   override suspend fun generatePlan(
@@ -48,10 +57,10 @@ class GeminiAiClient(
     personaName: String,
     memoryContext: List<String>
   ): AiPlanResult = withContext(Dispatchers.IO) {
-    val apiKey = apiKeyProvider()
+    val apiKey = sanitizeApiKey(apiKeyProvider())
 
     // If API key is empty or placeholder, gracefully use LocalNluEngine
-    if (apiKey.isBlank() || apiKey == "MY_GEMINI_API_KEY") {
+    if (apiKey.isBlank()) {
       Log.d(TAG, "Using LocalNluEngine (API key not configured or default placeholder)")
       return@withContext LocalNluEngine.parse(prompt, personaName)
     }

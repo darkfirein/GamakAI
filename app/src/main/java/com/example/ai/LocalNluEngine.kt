@@ -589,9 +589,9 @@ object LocalNluEngine {
     // General Questions / Informational queries fallback
     if (containsAny(lower, "what is", "why", "who is", "how", "क्या है", "किसे कहते", "किन", "कसरी", "कहाँ", "कसको", "बताओ", "explain", "meaning", "define")) {
       val reply = when {
-        isNepali -> "विस्तृत ज्ञान र खोजका लागि इन्टरनेट वा Gemini AI सेवा आवश्यक पर्दछ। तर म तपाईंको फोनमा कल गर्न, म्यासेज पठाउन, अलार्म लगाउन, मौसम हेर्न वा एपहरू खोल्न सक्छु।"
-        isEnglish -> "For in-depth online answers, an active connection with Gemini AI is recommended. Meanwhile, I can help you make calls, send messages, set alarms, navigate, or launch apps on your device."
-        else -> "विस्तृत जानकारी और ऑनलाइन उत्तरों के लिए Gemini AI सेवा का उपयोग किया जा सकता है। इस बीच, मैं आपके डिवाइस पर कॉल, मैसेज, अलार्म, टाइमर, मौसम या ऐप्स खोलने में पूरी मदद कर सकता हूँ।"
+        isNepali -> "विस्तृत ज्ञान र उत्तरका लागि क्लाउड एआई सेवा आवश्यक पर्दछ। तर म तपाईंको फोनमा कल गर्न, म्यासेज पठाउन, अलार्म लगाउन, मौसम हेर्न वा एपहरू खोल्न सक्छु।"
+        isEnglish -> "For in-depth answers and explanations, an active cloud AI connection is recommended. Meanwhile, I can help you make calls, send messages, set alarms, navigate, or launch apps on your device."
+        else -> "विस्तृत जानकारी और ऑनलाइन उत्तरों के लिए क्लाउड AI सेवा की आवश्यकता होती है। इस बीच, मैं आपके डिवाइस पर कॉल, मैसेज, अलार्म, टाइमर, मौसम या ऐप्स खोलने में पूरी मदद कर सकता हूँ।"
       }
       return AiPlanResult.Conversation(responseText = reply)
     }
