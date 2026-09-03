@@ -27,37 +27,39 @@ class CompositeAiClient(
     // 1. Tier 1: Primary AI Engine (OpenAI)
     if (primaryClient.isAvailable()) {
       try {
-        Log.d(TAG, "Executing plan with primary AI engine (OpenAI)")
+        Log.d(TAG, "Routing query to primary AI engine (OpenAI)")
         val result = primaryClient.generatePlan(prompt, conversationHistory, personaName, memoryContext)
         if (result !is AiPlanResult.Error) {
+          Log.d(TAG, "Primary AI engine (OpenAI) successfully handled request.")
           return result
         }
-        Log.w(TAG, "Primary AI returned error: ${result.message}. Cascading to secondary AI engine.")
+        Log.w(TAG, "Primary AI (OpenAI) fallback reason: ${result.message}. Cascading to secondary engine.")
       } catch (e: Exception) {
-        Log.w(TAG, "Primary AI engine execution failed. Cascading to secondary AI engine.", e)
+        Log.w(TAG, "Primary AI engine execution threw exception: ${e.message}. Cascading to secondary engine.", e)
       }
     } else {
-      Log.d(TAG, "Primary AI engine (OpenAI) not available/configured.")
+      Log.d(TAG, "Primary AI engine (OpenAI) is not available/configured.")
     }
 
     // 2. Tier 2: Secondary AI Engine (Gemini)
     if (secondaryClient.isAvailable()) {
       try {
-        Log.d(TAG, "Executing plan with secondary AI engine (Gemini)")
+        Log.d(TAG, "Routing query to secondary AI engine (Gemini)")
         val result = secondaryClient.generatePlan(prompt, conversationHistory, personaName, memoryContext)
         if (result !is AiPlanResult.Error) {
+          Log.d(TAG, "Secondary AI engine (Gemini) successfully handled request.")
           return result
         }
-        Log.w(TAG, "Secondary AI returned error: ${result.message}. Cascading to Local NLU.")
+        Log.w(TAG, "Secondary AI (Gemini) fallback reason: ${result.message}. Cascading to Local NLU.")
       } catch (e: Exception) {
-        Log.w(TAG, "Secondary AI engine execution failed. Cascading to Local NLU.", e)
+        Log.w(TAG, "Secondary AI engine execution threw exception: ${e.message}. Cascading to Local NLU.", e)
       }
     } else {
-      Log.d(TAG, "Secondary AI engine (Gemini) not available/configured.")
+      Log.d(TAG, "Secondary AI engine (Gemini) is not available/configured.")
     }
 
     // 3. Tier 3: Deterministic & Multilingual Local NLU Fallback
-    Log.d(TAG, "Executing plan with deterministic LocalNluEngine fallback")
+    Log.d(TAG, "Fallback triggered: Using deterministic LocalNluEngine fallback.")
     return LocalNluEngine.parse(prompt, personaName)
   }
 }

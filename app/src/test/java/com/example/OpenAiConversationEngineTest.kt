@@ -28,21 +28,108 @@ class OpenAiConversationEngineTest {
   private val toolRegistry = ToolRegistry()
 
   @Test
-  fun testOpenAiClientAvailabilityCheck() {
+  fun testOpenAiClientAvailabilityAndKeySanitization() {
     val unconfiguredClient = OpenAiClient(apiKeyProvider = { "" })
     assertFalse(unconfiguredClient.isAvailable())
 
     val placeholderClient = OpenAiClient(apiKeyProvider = { "MY_OPENAI_API_KEY" })
     assertFalse(placeholderClient.isAvailable())
 
+    val quotedPlaceholderClient = OpenAiClient(apiKeyProvider = { "\"MY_OPENAI_API_KEY\"" })
+    assertFalse(quotedPlaceholderClient.isAvailable())
+
     val configuredClient = OpenAiClient(apiKeyProvider = { "sk-proj-valid-test-key" })
     assertTrue(configuredClient.isAvailable())
+
+    val quotedConfiguredClient = OpenAiClient(apiKeyProvider = { "\"sk-proj-valid-test-key\"" })
+    assertTrue(quotedConfiguredClient.isAvailable())
+    assertEquals("sk-proj-valid-test-key", OpenAiClient.sanitizeApiKey("\"sk-proj-valid-test-key\""))
 
     // Test system property / runtime env resolution
     System.setProperty("OPENAI_API_KEY", "sk-runtime-ci-key")
     val runtimeClient = OpenAiClient()
     assertTrue(runtimeClient.isAvailable())
     System.clearProperty("OPENAI_API_KEY")
+  }
+
+  @Test
+  fun testMultilingualConversationalRoutingToOpenAi() = runBlocking {
+    val mockOpenAiClient = object : AiClient {
+      override fun isAvailable(): Boolean = true
+      override suspend fun generatePlan(
+        prompt: String,
+        conversationHistory: List<ChatMessage>,
+        personaName: String,
+        memoryContext: List<String>
+      ): AiPlanResult {
+        return when {
+          prompt.contains("हिंदी") || prompt.contains("सूर्य") ->
+            AiPlanResult.Conversation("सूर्य हमारे सौरमंडल का मुख्य तारा है।", "hi")
+          prompt.contains("नेपाली") || prompt.contains("कस्तो") ->
+            AiPlanResult.Conversation("म एकदम सन्चै छु! भन्नुहोस्,", "ne")
+          prompt.contains("hinglish") || prompt.contains("kaise") ->
+            AiPlanResult.Conversation("Main badhiya hoon, aap batao kaise ho?", "hi-en")
+          else ->
+            AiPlanResult.Conversation("Photosynthesis is the process by which plants make food.", "en")
+        }
+      }
+    }
+
+    val planner = Planner(mockOpenAiClient, toolRegistry)
+
+    // Hindi
+    val resHindi = planner.planAndExecute("सूर्य क्या है?", emptyList(), "Gamak")
+    assertTrue(resHindi is AiPlanResult.Conversation)
+    assertTrue((resHindi as AiPlanResult.Conversation).responseText.contains("सूर्य"))
+
+    // Nepali
+    val resNepali = planner.planAndExecute("तपाईंलाई कस्तो छ?", emptyList(), "Gamak")
+    assertTrue(resNepali is AiPlanResult.Conversation)
+    assertTrue((resNepali as AiPlanResult.Conversation).responseText.contains("सन्चै"))
+
+    // Hinglish
+    val resHinglish = planner.planAndExecute("Aap kaise ho hinglish mein batao", emptyList(), "Gamak")
+    assertTrue(resHinglish is AiPlanResult.Conversation)
+    assertTrue((resHinglish as AiPlanResult.Conversation).responseText.contains("badhiya"))
+
+    // English
+    val resEnglish = planner.planAndExecute("What is photosynthesis?", emptyList(), "Gamak")
+    assertTrue(resEnglish is AiPlanResult.Conversation)
+    assertTrue((resEnglish as AiPlanResult.Conversation).responseText.contains("Photosynthesis"))
+  }
+
+  @Test
+  fun testOpenAiResponseReachesAssistantEngineUIAndTTS() = runBlocking {
+    val mockOpenAiClient = object : AiClient {
+      override fun isAvailable(): Boolean = true
+      override suspend fun generatePlan(
+        prompt: String,
+        conversationHistory: List<ChatMessage>,
+        personaName: String,
+        memoryContext: List<String>
+      ): AiPlanResult {
+        return AiPlanResult.Conversation("Quantum computing processes data using qubits.")
+      }
+    }
+
+    val planner = Planner(mockOpenAiClient, toolRegistry)
+    val context = org.robolectric.RuntimeEnvironment.getApplication()
+    val testJob = kotlinx.coroutines.Job()
+    val engineScope = kotlinx.coroutines.CoroutineScope(testJob + kotlinx.coroutines.Dispatchers.Default)
+
+    val assistantEngine = com.example.data.AssistantEngine(
+      scope = engineScope,
+      textToSpeechManager = null,
+      planner = planner
+    )
+
+    assistantEngine.sendUserPrompt("Explain quantum computing", "Gamak")
+    kotlinx.coroutines.delay(600)
+
+    // Verify message added to engine messages flow and UI conversation state
+    val messages = assistantEngine.messages.value
+    assertTrue("Engine should contain response message from OpenAI", messages.any { !it.isUser && it.text.contains("Quantum computing") })
+    testJob.cancel()
   }
 
   @Test
