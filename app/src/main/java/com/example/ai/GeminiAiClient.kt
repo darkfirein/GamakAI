@@ -34,7 +34,7 @@ class GeminiAiClient(
   companion object {
     private const val TAG = "GeminiAiClient"
     private const val MODEL_ENDPOINT =
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent"
   }
 
   override fun isAvailable(): Boolean {
