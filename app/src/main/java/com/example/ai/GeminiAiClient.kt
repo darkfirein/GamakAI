@@ -186,13 +186,19 @@ class GeminiAiClient(
 
       if (!response.isSuccessful || responseBodyString.isNullOrBlank()) {
         Log.w(TAG, "Gemini API returned code ${response.code}: $responseBodyString. Falling back to LocalNluEngine.")
-        return@withContext LocalNluEngine.parse(prompt, personaName)
+        return@withContext AiPlanResult.Conversation(
+          responseText = "[DEBUG] Gemini HTTP ${response.code}: ${responseBodyString?.take(300)}",
+          detectedLanguage = "en"
+        )
       }
 
       parseGeminiResponse(responseBodyString, prompt, personaName)
     } catch (e: Exception) {
       Log.e(TAG, "Gemini API error, using LocalNluEngine fallback", e)
-      LocalNluEngine.parse(prompt, personaName)
+      AiPlanResult.Conversation(
+        responseText = "[DEBUG] Gemini exception: ${e.javaClass.simpleName}: ${e.message}",
+        detectedLanguage = "en"
+      )
     }
   }
 
